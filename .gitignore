@@ -1,5 +1,12 @@
 docs/site/
 
+#checkpoints
+src/labram_ft/checkpoints/
+
+# macOS metadata folders and files
+.DS_Store
+._*
+
 # test cache
 manual_test/
 
