@@ -211,7 +211,7 @@ def get_args():
 
 def get_models(args):
     model = create_model(
-        model_name,
+        args.model,
         pretrained=False,
         num_classes=args.nb_classes,
         drop_rate=args.drop,

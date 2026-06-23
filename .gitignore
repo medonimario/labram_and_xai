@@ -3,6 +3,13 @@ docs/site/
 #checkpoints
 src/labram_ft/checkpoints/
 
+# testing files
+src/labram_ft/dataset_maker/verify_dyads.py
+
+# wandb
+src/labram_ft/log/
+wandb/
+
 # macOS metadata folders and files
 .DS_Store
 ._*
