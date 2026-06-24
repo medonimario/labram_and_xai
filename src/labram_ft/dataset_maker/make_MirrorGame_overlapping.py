@@ -109,12 +109,12 @@ def process_epoch_file(params):
         with open("my-dataset-process-error-files.txt", "a") as f:
             f.write(f"{filepath} - {e}\n")
 
-def get_subject_from_filename(filename):
+def get_dyad_from_filename(filename):
     """
-    Extracts the subject ID from a filename like 's_101_Coordination.set'.
-    It captures the number following 's_'.
+    Extracts the dyad ID from a filename like 's_103_Coordination.set' or 's_203_Solo.set'.
+    It captures the last two digits of the subject number as the dyad identifier.
     """
-    match = re.search(r's_(\d+)', filename)
+    match = re.search(r's_\d(\d{2})_', filename)
     if match:
         return int(match.group(1))
     return None
@@ -123,51 +123,51 @@ if __name__ == "__main__":
     # Set path to your dataset folder (containing the .set files)
     raw_dataset_path = os.getenv("MG_DATASET_PATH") + "preprocessed/"
 
-    # Filter for .set files and only include 'Spontaneous' or 'Coordination' conditions
+    # Filter for .set files and only include 'Solo' or 'Spontaneous' conditions
     all_files = [
         f for f in os.listdir(raw_dataset_path) 
-        if f.endswith(".set") and ('Spontaneous' in f or 'Coordination' in f)
+        if f.endswith(".set") and ('Solo' in f or 'Spontaneous' in f)
     ]
     
-    # Group all relevant files by their subject ID
-    subject_files = defaultdict(list)
+    # Group all relevant files by their Dyad ID
+    dyad_files = defaultdict(list)
     for f in all_files:
-        subject_id = get_subject_from_filename(f)
-        if subject_id:
-            subject_files[subject_id].append(f)
+        dyad_id = get_dyad_from_filename(f)
+        if dyad_id is not None:
+            dyad_files[dyad_id].append(f)
         else:
-            print(f"Warning: Could not find subject ID for file {f}")
+            print(f"Warning: Could not find structural dyad ID for file {f}")
 
-    # Split by subject ID for train, val, test
-    all_subject_ids = sorted(subject_files.keys())
+    # Split by Dyad ID for train, val, test
+    all_dyad_ids = sorted(dyad_files.keys())
     np.random.seed(42) # for reproducibility
-    np.random.shuffle(all_subject_ids)
+    np.random.shuffle(all_dyad_ids)
 
-    # Splitting subjects: ~80% train, ~10% validation, ~10% test
-    train_split = int(len(all_subject_ids) * 0.8)
-    val_split = int(len(all_subject_ids) * 0.9)
+    # Splitting dyads: ~80% train, ~10% validation, ~10% test
+    train_split = int(len(all_dyad_ids) * 0.8)
+    val_split = int(len(all_dyad_ids) * 0.9)
 
-    train_subject_ids = all_subject_ids[:train_split]
-    val_subject_ids = all_subject_ids[train_split:val_split]
-    test_subject_ids = all_subject_ids[val_split:]
+    train_dyad_ids = all_dyad_ids[:train_split]
+    val_dyad_ids = all_dyad_ids[train_split:val_split]
+    test_dyad_ids = all_dyad_ids[val_split:]
 
-    print(f"Total subjects: {len(all_subject_ids)}")
-    print(f"Train subjects ({len(train_subject_ids)}): {train_subject_ids}")
-    print(f"Validation subjects ({len(val_subject_ids)}): {val_subject_ids}")
-    print(f"Test subjects ({len(test_subject_ids)}): {test_subject_ids}")
+    print(f"Total unique dyads: {len(all_dyad_ids)}")
+    print(f"Train dyads ({len(train_dyad_ids)}): {train_dyad_ids}")
+    print(f"Validation dyads ({len(val_dyad_ids)}): {val_dyad_ids}")
+    print(f"Test dyads ({len(test_dyad_ids)}): {test_dyad_ids}")
 
-    # Create file lists based on subject splits
-    train_files = [f for sid in train_subject_ids for f in subject_files[sid]]
-    val_files = [f for sid in val_subject_ids for f in subject_files[sid]]
-    test_files = [f for sid in test_subject_ids for f in subject_files[sid]]
+    # Create file lists based on dyad splits (pulls both S1 and S2 files for that dyad)
+    train_files = [f for did in train_dyad_ids for f in dyad_files[did]]
+    val_files = [f for did in val_dyad_ids for f in dyad_files[did]]
+    test_files = [f for did in test_dyad_ids for f in dyad_files[did]]
 
     # Set your processed data path
     final_root = os.getenv("MG_DATASET_PATH") # Make sure to set this in your .env file
     
     # Create the train, val, test sample folders
-    train_dump_folder = os.path.join(final_root, "processed_spont-coord_overlapping", "train")
-    val_dump_folder = os.path.join(final_root, "processed_spont-coord_overlapping", "val")
-    test_dump_folder = os.path.join(final_root, "processed_spont-coord_overlapping", "test")
+    train_dump_folder = os.path.join(final_root, "processed_solo-spont_overlapping", "train")
+    val_dump_folder = os.path.join(final_root, "processed_solo-spont_overlapping", "val")
+    test_dump_folder = os.path.join(final_root, "processed_solo-spont_overlapping", "test")
 
     os.makedirs(train_dump_folder, exist_ok=True)
     os.makedirs(val_dump_folder, exist_ok=True)
@@ -181,7 +181,7 @@ if __name__ == "__main__":
         for f in file_list:
             filepath = os.path.join(raw_dataset_path, f)
             # Determine label from filename: 0 for Solo, 1 for Spontaneous
-            label = 1 if 'Coordination' in f else 0
+            label = 1 if 'Spontaneous' in f else 0
             params.append([filepath, dump_folder, standard_channels, label])
         return params
 
