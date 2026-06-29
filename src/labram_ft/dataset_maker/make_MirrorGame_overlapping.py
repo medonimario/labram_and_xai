@@ -123,10 +123,10 @@ if __name__ == "__main__":
     # Set path to your dataset folder (containing the .set files)
     raw_dataset_path = os.getenv("MG_DATASET_PATH") + "preprocessed/"
 
-    # Filter for .set files and only include 'Solo' or 'Spontaneous' conditions
+    # Filter for .set files and only include 'Spontaneous' or 'Coordination' conditions
     all_files = [
         f for f in os.listdir(raw_dataset_path) 
-        if f.endswith(".set") and ('Solo' in f or 'Spontaneous' in f)
+        if f.endswith(".set") and ('Spontaneous' in f or 'Coordination' in f)
     ]
     
     # Group all relevant files by their Dyad ID
@@ -165,9 +165,9 @@ if __name__ == "__main__":
     final_root = os.getenv("MG_DATASET_PATH") # Make sure to set this in your .env file
     
     # Create the train, val, test sample folders
-    train_dump_folder = os.path.join(final_root, "processed_solo-spont_overlapping", "train")
-    val_dump_folder = os.path.join(final_root, "processed_solo-spont_overlapping", "val")
-    test_dump_folder = os.path.join(final_root, "processed_solo-spont_overlapping", "test")
+    train_dump_folder = os.path.join(final_root, "processed_spont-coord_overlapping", "train")
+    val_dump_folder = os.path.join(final_root, "processed_spont-coord_overlapping", "val")
+    test_dump_folder = os.path.join(final_root, "processed_spont-coord_overlapping", "test")
 
     os.makedirs(train_dump_folder, exist_ok=True)
     os.makedirs(val_dump_folder, exist_ok=True)
@@ -180,8 +180,8 @@ if __name__ == "__main__":
         params = []
         for f in file_list:
             filepath = os.path.join(raw_dataset_path, f)
-            # Determine label from filename: 0 for Solo, 1 for Spontaneous
-            label = 1 if 'Spontaneous' in f else 0
+            # Determine label from filename: 0 for Spontaneous, 1 for Coordination
+            label = 1 if 'Coordination' in f else 0
             params.append([filepath, dump_folder, standard_channels, label])
         return params
 

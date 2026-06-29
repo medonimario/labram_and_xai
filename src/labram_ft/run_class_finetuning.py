@@ -44,9 +44,9 @@ TUAB_DATASET_ROOT = os.path.join(PROCESSED_DATASET_PATH, "tuh_eeg_abnormal/proce
 FORCEGAME_DATASET_ROOT = os.path.join(FG_DATASET_PATH, "processed")
 FORCEGAME_GROUP_DATASET_ROOT = os.path.join(FG_DATASET_PATH, "processed_group")
 FORCEGAME_FRIENDSHIP_DATASET_ROOT = os.path.join(FG_DATASET_PATH, "processed_friendship")
-MIRRORGAME_DATASET_ROOT = os.path.join(MG_DATASET_PATH, "processed_solo-coord_overlapping")
-MIRRORGAME_INSTRUCTED_DATASET_ROOT = os.path.join(MG_DATASET_PATH, "processed_instructed")
-MIRRORGAME_SOLO_SPONT_DATASET_ROOT = os.path.join(MG_DATASET_PATH, "processed_solo-spont")
+MIRRORGAME_SOLO_COORD_DATASET_ROOT = os.path.join(MG_DATASET_PATH, "processed_solo-coord_overlapping")
+MIRRORGAME_SPONT_COORD_DATASET_ROOT = os.path.join(MG_DATASET_PATH, "processed_spont-coord_overlapping")
+MIRRORGAME_SOLO_SPONT_DATASET_ROOT = os.path.join(MG_DATASET_PATH, "processed_solo-spont_overlapping")
 CIRCLING_DATASET_ROOT = os.path.join(os.getenv("CIRCLING_DATASET_PATH", ""), "processed_overlapping")
 
 def get_args():
@@ -191,7 +191,7 @@ def get_args():
 
     parser.add_argument('--enable_deepspeed', action='store_true', default=False)
     parser.add_argument('--dataset', default='TUAB', type=str,
-                        help='dataset: TUAB | TUEV | FORCEGAME | FORCEGAME_GROUP | FORCEGAME_FRIENDSHIP | MIRRORGAME | MIRRORGAME_INSTRUCTED')
+                        help='dataset: TUAB | TUEV | FORCEGAME | FORCEGAME_GROUP | FORCEGAME_FRIENDSHIP | MIRRORGAME_SOLO_COORD | MIRRORGAME_INSTRUCTED')
 
     known_args, _ = parser.parse_known_args()
 
@@ -294,8 +294,8 @@ def get_dataset(args):
         args.nb_classes = 1
         metrics = ["pr_auc", "roc_auc", "accuracy", "balanced_accuracy"]
 
-    elif args.dataset == 'MIRRORGAME':
-        train_dataset, test_dataset, val_dataset = utils.prepare_MIRRORGAME_dataset(MIRRORGAME_DATASET_ROOT)
+    elif args.dataset == 'MIRRORGAME_SOLO_COORD':
+        train_dataset, test_dataset, val_dataset = utils.prepare_MIRRORGAME_dataset(MIRRORGAME_SOLO_COORD_DATASET_ROOT)
         ch_names = ['FP1','FPZ','FP2',
                      'AF7','AF3','AFZ','AF4','AF8',
                      'F7','F5','F3','F1','FZ','F2','F4','F6','F8',
@@ -310,8 +310,8 @@ def get_dataset(args):
         args.nb_classes = 1
         metrics = ["pr_auc", "roc_auc", "accuracy", "balanced_accuracy"]
 
-    elif args.dataset == 'MIRRORGAME_INSTRUCTED':
-        train_dataset, test_dataset, val_dataset = utils.prepare_MIRRORGAME_dataset(MIRRORGAME_INSTRUCTED_DATASET_ROOT)
+    elif args.dataset == 'MIRRORGAME_SPONT_COORD':
+        train_dataset, test_dataset, val_dataset = utils.prepare_MIRRORGAME_dataset(MIRRORGAME_SPONT_COORD_DATASET_ROOT)
         ch_names = ['FP1','FPZ','FP2',
                      'AF7','AF3','AFZ','AF4','AF8',
                      'F7','F5','F3','F1','FZ','F2','F4','F6','F8',
@@ -372,21 +372,21 @@ def main(args, ds_init):
     elif args.dataset == 'TUAB':
         project_name = "labram-ft-tuab"
     elif args.dataset == 'FORCEGAME':
-        project_name = "labram-ft-forcegame"
+        project_name = "labram-ft-fg"
     elif args.dataset == 'FORCEGAME_GROUP':
         project_name = "labram-ft-forcegame-group"
     elif args.dataset == 'FORCEGAME_FRIENDSHIP':
         project_name = "labram-ft-forcegame-friendship"
-    elif args.dataset == 'MIRRORGAME':
-        project_name = "labram-ft-mirrorgame"
-    elif args.dataset == 'MIRRORGAME_INSTRUCTED':
-        project_name = "labram-ft-mirrorgame-instructed"
+    elif args.dataset == 'MIRRORGAME_SOLO_COORD':
+        project_name = "labram-ft-mg-solo-coord"
+    elif args.dataset == 'MIRRORGAME_SPONT_COORD':
+        project_name = "labram-ft-mg-spont-coord"
     elif args.dataset == 'MIRRORGAME_SOLO_SPONT':
-        project_name = "labram-ft-mirrorgame-solo-spont"
+        project_name = "labram-ft-mg-solo-spont"
     elif args.dataset == 'CIRCLING':
         project_name = "labram-ft-circling"
     else:
-        raise NotImplementedError("Only TUAB, TUEV, FORCEGAME, and MIRRORGAME are supported.")
+        raise NotImplementedError("Only TUAB, TUEV, FORCEGAME, MIRRORGAME_SOLO_COORD, MIRRORGAME_SPONT_COORD, MIRRORGAME_SOLO_SPONT, and CIRCLING are supported.")
     
     if utils.is_main_process():
         wandb.init(

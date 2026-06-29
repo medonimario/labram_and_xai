@@ -376,6 +376,23 @@ class NeuralTransformer(nn.Module):
         for blk in self.blocks:
             x = blk(x, rel_pos_bias=None)
         
+        # x = self.norm(x)
+        # if self.fc_norm is not None:
+        #     if return_all_tokens:
+        #         return self.fc_norm(x)
+        #     t = x[:, 1:, :]
+        #     if return_patch_tokens:
+        #         return self.fc_norm(t)
+        #     else:
+        #         return self.fc_norm(t.mean(1))
+        # else:
+        #     if return_all_tokens:
+        #         return x
+        #     elif return_patch_tokens:
+        #         return x[:, 1:]
+        #     else:
+        #         return x[:, 0]
+
         x = self.norm(x)
         if self.fc_norm is not None:
             if return_all_tokens:
@@ -384,14 +401,27 @@ class NeuralTransformer(nn.Module):
             if return_patch_tokens:
                 return self.fc_norm(t)
             else:
-                return self.fc_norm(t.mean(1))
+                # --- NEW ATTENTION POOLING LOGIC ---
+                if self.use_attention_pooling:
+                    attn_logits = self.attention_pool(t) # Shape: [B, N_A, 1]
+                    attn_weights = F.softmax(attn_logits, dim=1)
+                    return self.fc_norm((t * attn_weights).sum(dim=1))
+                else:
+                    return self.fc_norm(t.mean(1))
         else:
             if return_all_tokens:
                 return x
             elif return_patch_tokens:
                 return x[:, 1:]
             else:
-                return x[:, 0]
+                # --- NEW ATTENTION POOLING LOGIC ---
+                if self.use_attention_pooling:
+                    t = x[:, 1:, :]
+                    attn_logits = self.attention_pool(t) # Shape: [B, N_A, 1]
+                    attn_weights = F.softmax(attn_logits, dim=1)
+                    return (t * attn_weights).sum(dim=1)
+                else:
+                    return x[:, 0]
 
     def forward(self, x, input_chans=None, return_patch_tokens=False, return_all_tokens=False, **kwargs):
         '''
