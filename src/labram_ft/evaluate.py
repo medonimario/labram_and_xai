@@ -8,7 +8,7 @@ from pathlib import Path
 
 # Assuming all provided scripts are in the same directory
 from run_class_finetuning import get_dataset, get_models
-from LaBraM_ft.engine_for_finetuning import evaluate
+from engine_for_finetuning import evaluate
 import utils
 
 def calculate_ci(metric_value, n_samples):

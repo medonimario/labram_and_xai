@@ -236,5 +236,5 @@ def extract_and_plot_attention(checkpoint_dir):
     print(f"All plots saved to {plot_dir}")
 
 if __name__ == "__main__":
-    TARGET_DIR = "./src/labram_ft/checkpoints/mg_solo-coord_v3/"
+    TARGET_DIR = "./src/labram_ft/checkpoints/fg_v1/"
     extract_and_plot_attention(TARGET_DIR)

@@ -2,6 +2,15 @@
 
 This project implements the fine-tuning of the Large Brain Model (LaBraM) and explainability tools for it
 
+## Phase 1 - Fine-tuning LaBraM
+- Make sure to prepare the dataset to be compatible with the LaBraM input. Examples can be found in `src/labram_ft/dataset_maker/`.
+- Select/create a suitable dataloader in `src/labram_ft/dataset_maker/utils.py`
+- Run the main script `src/labram_ft/dataset_maker/run_class_finetuning.py`
+
+## Phase 2 - XAI
+### Attention maps
+- If attention pooling was used during fine-tuning, you can run `src/xai_attention_maps/visualize_attention.py` for displaying the attention attributed to different patches by the model. This is a simple first interpretability step.
+
 ## Project structure
 
 The directory structure of the project looks like this:
