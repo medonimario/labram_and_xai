@@ -11,6 +11,8 @@ This project implements the fine-tuning of the Large Brain Model (LaBraM) and ex
 ### Attention maps
 - If attention pooling was used during fine-tuning, you can run `src/xai_attention_maps/visualize_attention.py` for displaying the attention attributed to different patches by the model. This is a simple first interpretability step.
 
+### TCAV
+
 ## Project structure
 
 The directory structure of the project looks like this:
