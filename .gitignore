@@ -1,7 +1,7 @@
 docs/site/
 
 #checkpoints
-src/labram_ft/checkpoints/
+models/checkpoints/
 
 # testing files
 src/labram_ft/dataset_maker/verify_dyads.py

@@ -431,46 +431,122 @@ class NeuralTransformer(nn.Module):
         x = self.forward_features(x, input_chans=input_chans, return_patch_tokens=return_patch_tokens, return_all_tokens=return_all_tokens, **kwargs)
         x = self.head(x)
         return x
+    
+    def forward_intermediate(self, x, input_chans=None, layer_id=12, norm_output=False):
+        # --- START: Logic from forward_features ---
+        batch_size, n, a, t = x.shape
+        input_time_window = a if t == self.patch_size else t
+        x = self.patch_embed(x) # x shape is [B, n*a, D] = [B, 64*4, D] = [B, 256, D]
 
-    def forward_intermediate(self, x, layer_id=12, norm_output=False):
-        x = self.patch_embed(x)
-        batch_size, seq_len, _ = x.size()
+        cls_tokens = self.cls_token.expand(batch_size, -1, -1)  # [B, 1, D]
+        x = torch.cat((cls_tokens, x), dim=1) # x shape is [B, 257, D]
 
-        cls_tokens = self.cls_token.expand(batch_size, -1, -1)  # stole cls_tokens impl from Phil Wang, thanks
-        x = torch.cat((cls_tokens, x), dim=1)
+        # Use input_chans to select the correct positional embeddings
+        pos_embed_used = self.pos_embed[:, input_chans] if input_chans is not None else self.pos_embed
+        
         if self.pos_embed is not None:
-            pos_embed = self.pos_embed[:, 1:, :].unsqueeze(2).expand(batch_size, -1, self.time_window, -1).flatten(1, 2)
-            pos_embed = torch.cat((self.pos_embed[:,0:1,:].expand(batch_size, -1, -1), pos_embed), dim=1)
-            x = x + pos_embed
+            # pos_embed_used[:, 1:, :] -> [B, 64, D] (channel embeddings)
+            pos_embed = pos_embed_used[:, 1:, :].unsqueeze(2).expand(batch_size, -1, input_time_window, -1).flatten(1, 2) # [B, 256, D]
+            
+            # pos_embed_used[:,0:1,:] -> [B, 1, D] (CLS token embedding)
+            pos_embed = torch.cat((pos_embed_used[:,0:1,:].expand(batch_size, -1, -1), pos_embed), dim=1) # [B, 257, D]
+            
+            # This will now work! x[B, 257, D] + pos_embed[B, 257, D]
+            x = x + pos_embed 
+        
         if self.time_embed is not None:
-            time_embed = self.time_embed.unsqueeze(1).expand(batch_size, 62, -1, -1).flatten(1, 2)
-            x[:, 1:, :] += time_embed
-        x = self.pos_drop(x)
+            nc = n if t == self.patch_size else a
+            time_embed = self.time_embed[:, 0:input_time_window, :].unsqueeze(1).expand(batch_size, nc, -1, -1).flatten(1, 2) # [B, 256, D]
+            x[:, 1:, :] += time_embed # Add to patch tokens only
 
-        rel_pos_bias = self.rel_pos_bias() if self.rel_pos_bias is not None else None
+        x = self.pos_drop(x)
+        # --- END: Logic from forward_features ---
+
+        rel_pos_bias = None # Not used in finetuning
+
         if isinstance(layer_id, list):
             output_list = []
             for l, blk in enumerate(self.blocks):
                 x = blk(x, rel_pos_bias=rel_pos_bias)
-                # use last norm for all intermediate layers
                 if l in layer_id:
-                    if norm_output:
-                        x_norm = self.fc_norm(self.norm(x[:, 1:]))
-                        output_list.append(x_norm)
-                    else:
-                        output_list.append(x[:, 1:])
-            return output_list
+                    output_list.append(x) 
+            
+            if norm_output:
+                 final_outputs = []
+                 for output in output_list:
+                     normed_output = self.norm(output) 
+                     normed_output_patches = normed_output[:, 1:] # [B, 256, D]
+                     
+                     # ---  (Averaging) ---
+                     normed_and_averaged = self.fc_norm(normed_output_patches.mean(1)) 
+                     final_outputs.append(normed_and_averaged)
+
+                     # --- (Flattening) ---
+                     # 1. Apply fc_norm to every patch individually (keeps shape [B, 256, 200])
+                    #  normed_patches = self.fc_norm(normed_output_patches)
+                    #  # 2. Flatten patches and dimensions (B, 256*200) -> (B, 51200)
+                    #  flattened = normed_patches.flatten(1)
+                    #  final_outputs.append(flattened)
+                     
+                 return final_outputs
+            else:
+                 # --- NEW CODE (Flattening for non-normed path too) ---
+                 return [out[:, 1:].flatten(1) for out in output_list]
+
         elif isinstance(layer_id, int):
+            # This logic is for getting input to a specific layer, which is fine
             for l, blk in enumerate(self.blocks):
                 if l < layer_id:
                     x = blk(x, rel_pos_bias=rel_pos_bias)
                 elif l == layer_id:
-                    x = blk.norm1(x)
+                    x = blk.norm1(x) # Get input to the attention layer
                 else:
                     break
-            return x[:, 1:]
+            # Return patch tokens, averaged
+            # Was: return x[:, 1:].mean(1)
+            return x[:, 1:].flatten(1)
         else:
             raise NotImplementedError(f"Not support for layer id is {layer_id} now!")
+
+    # def forward_intermediate(self, x, layer_id=12, norm_output=False):
+    #     x = self.patch_embed(x)
+    #     batch_size, seq_len, _ = x.size()
+
+    #     cls_tokens = self.cls_token.expand(batch_size, -1, -1)  # stole cls_tokens impl from Phil Wang, thanks
+    #     x = torch.cat((cls_tokens, x), dim=1)
+    #     if self.pos_embed is not None:
+    #         pos_embed = self.pos_embed[:, 1:, :].unsqueeze(2).expand(batch_size, -1, self.time_window, -1).flatten(1, 2)
+    #         pos_embed = torch.cat((self.pos_embed[:,0:1,:].expand(batch_size, -1, -1), pos_embed), dim=1)
+    #         x = x + pos_embed
+    #     if self.time_embed is not None:
+    #         time_embed = self.time_embed.unsqueeze(1).expand(batch_size, 62, -1, -1).flatten(1, 2)
+    #         x[:, 1:, :] += time_embed
+    #     x = self.pos_drop(x)
+
+    #     rel_pos_bias = self.rel_pos_bias() if self.rel_pos_bias is not None else None
+    #     if isinstance(layer_id, list):
+    #         output_list = []
+    #         for l, blk in enumerate(self.blocks):
+    #             x = blk(x, rel_pos_bias=rel_pos_bias)
+    #             # use last norm for all intermediate layers
+    #             if l in layer_id:
+    #                 if norm_output:
+    #                     x_norm = self.fc_norm(self.norm(x[:, 1:]))
+    #                     output_list.append(x_norm)
+    #                 else:
+    #                     output_list.append(x[:, 1:])
+    #         return output_list
+    #     elif isinstance(layer_id, int):
+    #         for l, blk in enumerate(self.blocks):
+    #             if l < layer_id:
+    #                 x = blk(x, rel_pos_bias=rel_pos_bias)
+    #             elif l == layer_id:
+    #                 x = blk.norm1(x)
+    #             else:
+    #                 break
+    #         return x[:, 1:]
+    #     else:
+    #         raise NotImplementedError(f"Not support for layer id is {layer_id} now!")
     
     def get_intermediate_layers(self, x, use_last_norm=False):
         x = self.patch_embed(x)
