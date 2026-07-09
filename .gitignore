@@ -2,10 +2,12 @@ docs/site/
 
 #checkpoints
 models/checkpoints/
+src/labram_ft/checkpoints/
 
 # testing files
 src/labram_ft/dataset_maker/verify_dyads.py
 src/labram_ft/dataset_maker/check_engagement.ipynb
+src/labram_ft/dataset_maker/verify_engagement_tfrs.py
 
 # wandb
 src/labram_ft/log/

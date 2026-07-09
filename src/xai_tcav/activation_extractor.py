@@ -10,10 +10,6 @@ import pickle
 load_dotenv()
 
 # Import the necessary functions and classes from the 'labram_ft' module
-# We need:
-#   - modeling_finetune: To get the NeuralTransformer class
-#   - utils: For helper functions like get_input_chans and load_state_dict
-#   - get_models: The factory function from the finetuning script to build the model
 import sys
 current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.abspath(os.path.join(current_dir, "..")))          # Adds 'src/'

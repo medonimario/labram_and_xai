@@ -38,6 +38,7 @@ load_dotenv()
 PROCESSED_DATASET_PATH = os.getenv("PROCESSED_DATASET_PATH", "") # Use a default empty string
 FG_DATASET_PATH = os.getenv("FG_DATASET_PATH", "")
 MG_DATASET_PATH = os.getenv("MG_DATASET_PATH", "")
+ENGAGEMENT_DATASET_PATH = os.getenv("ENGAGEMENT_DATASET_PATH", "")
 
 TUEV_DATASET_ROOT = os.path.join(PROCESSED_DATASET_PATH, "tuh_eeg_events/processed")
 TUAB_DATASET_ROOT = os.path.join(PROCESSED_DATASET_PATH, "tuh_eeg_abnormal/processed")
@@ -48,6 +49,7 @@ MIRRORGAME_SOLO_COORD_DATASET_ROOT = os.path.join(MG_DATASET_PATH, "processed_so
 MIRRORGAME_SPONT_COORD_DATASET_ROOT = os.path.join(MG_DATASET_PATH, "processed_spont-coord_overlapping")
 MIRRORGAME_SOLO_SPONT_DATASET_ROOT = os.path.join(MG_DATASET_PATH, "processed_solo-spont_overlapping")
 CIRCLING_DATASET_ROOT = os.path.join(os.getenv("CIRCLING_DATASET_PATH", ""), "processed_overlapping")
+ENGAGEMENT_DATASET_ROOT = os.path.join(ENGAGEMENT_DATASET_PATH, "processed")
 
 def get_args():
     parser = argparse.ArgumentParser('LaBraM fine-tuning and evaluation script for EEG classification', add_help=False)
@@ -135,6 +137,9 @@ def get_args():
                         help='Do not random erase first (clean) augmentation split')
 
     # * Finetuning params
+    # * Finetuning params
+    parser.add_argument('--linear_probe', action='store_true', default=False,
+                        help='Freeze the backbone and train only the head/pooling layers')
     parser.add_argument('--finetune', default='',
                         help='finetune from checkpoint')
     parser.add_argument('--model_key', default='model|module', type=str)
@@ -191,7 +196,7 @@ def get_args():
 
     parser.add_argument('--enable_deepspeed', action='store_true', default=False)
     parser.add_argument('--dataset', default='TUAB', type=str,
-                        help='dataset: TUAB | TUEV | FORCEGAME | FORCEGAME_GROUP | FORCEGAME_FRIENDSHIP | MIRRORGAME_SOLO_COORD | MIRRORGAME_INSTRUCTED')
+                        help='dataset: TUAB | TUEV | FORCEGAME | FORCEGAME_GROUP | FORCEGAME_FRIENDSHIP | MIRRORGAME_SOLO_COORD | MIRRORGAME_INSTRUCTED | ENGAGEMENT')
 
     known_args, _ = parser.parse_known_args()
 
@@ -356,6 +361,22 @@ def get_dataset(args):
                     ]
         args.nb_classes = 1
         metrics = ["pr_auc", "roc_auc", "accuracy", "balanced_accuracy"]
+
+    elif args.dataset == 'ENGAGEMENT':
+        train_dataset, test_dataset, val_dataset = utils.prepare_MIRRORGAME_dataset(ENGAGEMENT_DATASET_ROOT)
+        ch_names = ['FP1','FPZ','FP2',
+                     'AF7','AF3','AFZ','AF4','AF8',
+                     'F7','F5','F3','F1','FZ','F2','F4','F6','F8',
+                     'FT7','FC5','FC3','FC1','FCZ','FC2','FC4','FC6','FT8',
+                     'T7','C5','C3','C1','CZ','C2','C4','C6','T8',
+                     'TP7','CP5','CP3','CP1','CPZ','CP2','CP4','CP6','TP8',
+                     'P9','P7','P5','P3','P1','PZ','P2','P4','P6','P8','P10',
+                     'PO7','PO3','POZ','PO4','PO8',
+                     'O1','OZ','O2',
+                     'IZ'
+                    ]
+        args.nb_classes = 1
+        metrics = ["pr_auc", "roc_auc", "accuracy", "balanced_accuracy"]
     return train_dataset, test_dataset, val_dataset, ch_names, metrics
 
 
@@ -385,9 +406,11 @@ def main(args, ds_init):
         project_name = "labram-ft-mg-solo-spont"
     elif args.dataset == 'CIRCLING':
         project_name = "labram-ft-circling"
+    elif args.dataset == 'ENGAGEMENT':
+        project_name = "labram-ft-engagement"
     else:
-        raise NotImplementedError("Only TUAB, TUEV, FORCEGAME, MIRRORGAME_SOLO_COORD, MIRRORGAME_SPONT_COORD, MIRRORGAME_SOLO_SPONT, and CIRCLING are supported.")
-    
+        raise NotImplementedError("Only TUAB, TUEV, FORCEGAME, MIRRORGAME_SOLO_COORD, MIRRORGAME_SPONT_COORD, MIRRORGAME_SOLO_SPONT, CIRCLING, and ENGAGEMENT are supported.")
+
     if utils.is_main_process():
         wandb.init(
             project=project_name,
@@ -484,6 +507,17 @@ def main(args, ds_init):
         data_loader_test = None
 
     model = get_models(args)
+
+    # --- ADD THIS LINE FOR LINEAR PROBING ---
+    if args.linear_probe:
+        print("!!! Linear Probing Mode Enabled: Freezing the LaBraM backbone !!!")
+        for name, param in model.named_parameters():
+            # Keep head and attention pooling active, freeze everything else
+            if "head" in name or "attention_pool" in name:
+                param.requires_grad = True
+            else:
+                param.requires_grad = False
+    # ----------------------------------------
 
     patch_size = model.patch_size
     print("Patch size = %s" % str(patch_size))
