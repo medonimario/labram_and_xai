@@ -43,12 +43,17 @@ ENGAGEMENT_DATASET_PATH = os.getenv("ENGAGEMENT_DATASET_PATH", "")
 TUEV_DATASET_ROOT = os.path.join(PROCESSED_DATASET_PATH, "tuh_eeg_events/processed")
 TUAB_DATASET_ROOT = os.path.join(PROCESSED_DATASET_PATH, "tuh_eeg_abnormal/processed")
 FORCEGAME_DATASET_ROOT = os.path.join(FG_DATASET_PATH, "processed")
+# FORCEGAME_DATASET_ROOT = os.path.join(FG_DATASET_PATH, "processed_cv")
 FORCEGAME_GROUP_DATASET_ROOT = os.path.join(FG_DATASET_PATH, "processed_group")
 FORCEGAME_FRIENDSHIP_DATASET_ROOT = os.path.join(FG_DATASET_PATH, "processed_friendship")
 MIRRORGAME_SOLO_COORD_DATASET_ROOT = os.path.join(MG_DATASET_PATH, "processed_solo-coord_overlapping")
+# MIRRORGAME_SOLO_COORD_DATASET_ROOT = os.path.join(MG_DATASET_PATH, "processed_solo-coord_cv")
 MIRRORGAME_SPONT_COORD_DATASET_ROOT = os.path.join(MG_DATASET_PATH, "processed_spont-coord_overlapping")
+# MIRRORGAME_SPONT_COORD_DATASET_ROOT = os.path.join(MG_DATASET_PATH, "processed_spont-coord_cv")
 MIRRORGAME_SOLO_SPONT_DATASET_ROOT = os.path.join(MG_DATASET_PATH, "processed_solo-spont_overlapping")
+# MIRRORGAME_SOLO_SPONT_DATASET_ROOT = os.path.join(MG_DATASET_PATH, "processed_solo-spont_cv")
 CIRCLING_DATASET_ROOT = os.path.join(os.getenv("CIRCLING_DATASET_PATH", ""), "processed_overlapping")
+# CIRCLING_DATASET_ROOT = os.path.join(os.getenv("CIRCLING_DATASET_PATH", ""), "processed_cv")
 ENGAGEMENT_DATASET_ROOT = os.path.join(ENGAGEMENT_DATASET_PATH, "processed")
 
 def get_args():
@@ -59,6 +64,7 @@ def get_args():
     parser.add_argument('--save_ckpt_freq', default=5, type=int)
 
     # robust evaluation
+    parser.add_argument('--fold', type=int, default=-1, help='Which CV fold to run')
     parser.add_argument('--robust_test', default=None, type=str,
                         help='robust evaluation dataset')
     
@@ -136,7 +142,6 @@ def get_args():
     parser.add_argument('--resplit', action='store_true', default=False,
                         help='Do not random erase first (clean) augmentation split')
 
-    # * Finetuning params
     # * Finetuning params
     parser.add_argument('--linear_probe', action='store_true', default=False,
                         help='Freeze the backbone and train only the head/pooling layers')
@@ -252,7 +257,7 @@ def get_dataset(args):
         metrics = ["accuracy", "balanced_accuracy", "cohen_kappa", "f1_weighted"]
 
     elif args.dataset == 'FORCEGAME':
-        train_dataset, test_dataset, val_dataset = utils.prepare_FORCEGAME_dataset(FORCEGAME_DATASET_ROOT)
+        train_dataset, test_dataset, val_dataset = utils.prepare_FORCEGAME_dataset(FORCEGAME_DATASET_ROOT, fold=args.fold)
         ch_names = ['FP1','FPZ','FP2',
                      'AF7','AF3','AFZ','AF4','AF8',
                      'F7','F5','F3','F1','FZ','F2','F4','F6','F8',
@@ -300,7 +305,7 @@ def get_dataset(args):
         metrics = ["pr_auc", "roc_auc", "accuracy", "balanced_accuracy"]
 
     elif args.dataset == 'MIRRORGAME_SOLO_COORD':
-        train_dataset, test_dataset, val_dataset = utils.prepare_MIRRORGAME_dataset(MIRRORGAME_SOLO_COORD_DATASET_ROOT)
+        train_dataset, test_dataset, val_dataset = utils.prepare_MIRRORGAME_dataset(MIRRORGAME_SOLO_COORD_DATASET_ROOT, fold=args.fold)
         ch_names = ['FP1','FPZ','FP2',
                      'AF7','AF3','AFZ','AF4','AF8',
                      'F7','F5','F3','F1','FZ','F2','F4','F6','F8',
@@ -316,7 +321,7 @@ def get_dataset(args):
         metrics = ["pr_auc", "roc_auc", "accuracy", "balanced_accuracy"]
 
     elif args.dataset == 'MIRRORGAME_SPONT_COORD':
-        train_dataset, test_dataset, val_dataset = utils.prepare_MIRRORGAME_dataset(MIRRORGAME_SPONT_COORD_DATASET_ROOT)
+        train_dataset, test_dataset, val_dataset = utils.prepare_MIRRORGAME_dataset(MIRRORGAME_SPONT_COORD_DATASET_ROOT, fold=args.fold)
         ch_names = ['FP1','FPZ','FP2',
                      'AF7','AF3','AFZ','AF4','AF8',
                      'F7','F5','F3','F1','FZ','F2','F4','F6','F8',
@@ -331,7 +336,7 @@ def get_dataset(args):
         args.nb_classes = 1
         metrics = ["pr_auc", "roc_auc", "accuracy", "balanced_accuracy"]
     elif args.dataset == 'MIRRORGAME_SOLO_SPONT':
-        train_dataset, test_dataset, val_dataset = utils.prepare_MIRRORGAME_dataset(MIRRORGAME_SOLO_SPONT_DATASET_ROOT)
+        train_dataset, test_dataset, val_dataset = utils.prepare_MIRRORGAME_dataset(MIRRORGAME_SOLO_SPONT_DATASET_ROOT, fold=args.fold)
         ch_names = ['FP1','FPZ','FP2',
                      'AF7','AF3','AFZ','AF4','AF8',
                      'F7','F5','F3','F1','FZ','F2','F4','F6','F8',
@@ -347,7 +352,7 @@ def get_dataset(args):
         metrics = ["pr_auc", "roc_auc", "accuracy", "balanced_accuracy"]
 
     elif args.dataset == 'CIRCLING':
-        train_dataset, test_dataset, val_dataset = utils.prepare_MIRRORGAME_dataset(CIRCLING_DATASET_ROOT)
+        train_dataset, test_dataset, val_dataset = utils.prepare_MIRRORGAME_dataset(CIRCLING_DATASET_ROOT, fold=args.fold)
         ch_names = ['FP1','FPZ','FP2',
                      'AF7','AF3','AFZ','AF4','AF8',
                      'F7','F5','F3','F1','FZ','F2','F4','F6','F8',
@@ -415,7 +420,7 @@ def main(args, ds_init):
         wandb.init(
             project=project_name,
             config=args,                  # Log all hyperparameters
-            name=f"bs{args.batch_size*args.update_freq}-lr{args.lr}" # A descriptive name for the run
+            name=f"bs{args.batch_size*args.update_freq}-lr{args.lr}-fold{args.fold}" if args.fold != -1 else f"bs{args.batch_size*args.update_freq}-lr{args.lr}" # A descriptive name for the run
         )
 
     device = torch.device(args.device)

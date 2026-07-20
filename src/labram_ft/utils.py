@@ -793,41 +793,93 @@ class TUEVLoader(torch.utils.data.Dataset):
         X = torch.FloatTensor(X)
         return X, Y
 
-def prepare_FORCEGAME_dataset(root):
+def prepare_FORCEGAME_dataset(root, fold=-1):
     # set random seed for reproducibility if needed, though shuffling is often handled by the sampler
     seed = 42
     np.random.seed(seed)
 
-    train_files = os.listdir(os.path.join(root, "train"))
-    np.random.shuffle(train_files)
-    val_files = os.listdir(os.path.join(root, "val"))
-    test_files = os.listdir(os.path.join(root, "test"))
+    if fold != -1:
+        # --- NEW 10-FOLD LOGIC ---
+        test_fold = fold
+        val_fold = (fold + 1) % 10
+        train_folds = [i for i in range(10) if i not in (test_fold, val_fold)]
 
-    print(f"Found {len(train_files)} train, {len(val_files)} val, {len(test_files)} test files.")
+        def get_files_from_folds(fold_list):
+            files = []
+            for f in fold_list:
+                fold_dir = os.path.join(root, f"fold_{f}")
+                # Keep track of relative path so the loader finds it correctly
+                files.extend([os.path.join(f"fold_{f}", fname) for fname in os.listdir(fold_dir)])
+            return files
+
+        train_files = get_files_from_folds(train_folds)
+        val_files = get_files_from_folds([val_fold])
+        test_files = get_files_from_folds([test_fold])
+        
+        np.random.shuffle(train_files)
+        print(f"CV Fold {fold}: Found {len(train_files)} train, {len(val_files)} val, {len(test_files)} test files.")
+        
+    else:
+        # --- OLD LOGIC (Fallback) ---
+        train_files = os.listdir(os.path.join(root, "train"))
+        np.random.shuffle(train_files)
+        val_files = os.listdir(os.path.join(root, "val"))
+        test_files = os.listdir(os.path.join(root, "test"))
+
+        print(f"Found {len(train_files)} train, {len(val_files)} val, {len(test_files)} test files.")
+        
+        # Prepend 'train/', 'val/', 'test/' so the loader finds them
+        train_files = [os.path.join("train", f) for f in train_files]
+        val_files = [os.path.join("val", f) for f in val_files]
+        test_files = [os.path.join("test", f) for f in test_files]
 
     # prepare training and test data loader
-    train_dataset = FORCEGAMELoader(os.path.join(root, "train"), train_files)
-    test_dataset = FORCEGAMELoader(os.path.join(root, "test"), test_files)
-    val_dataset = FORCEGAMELoader(os.path.join(root, "val"), val_files)
+    train_dataset = FORCEGAMELoader(root, train_files)
+    test_dataset = FORCEGAMELoader(root, test_files)
+    val_dataset = FORCEGAMELoader(root, val_files)
 
     return train_dataset, test_dataset, val_dataset
 
-def prepare_MIRRORGAME_dataset(root):
-    # set random seed for reproducibility if needed, though shuffling is often handled by the sampler
+def prepare_MIRRORGAME_dataset(root, fold=-1):
     seed = 42
     np.random.seed(seed)
 
-    train_files = os.listdir(os.path.join(root, "train"))
-    np.random.shuffle(train_files)
-    val_files = os.listdir(os.path.join(root, "val"))
-    test_files = os.listdir(os.path.join(root, "test"))
+    if fold != -1:
+        # --- NEW 10-FOLD LOGIC ---
+        test_fold = fold
+        val_fold = (fold + 1) % 10
+        train_folds = [i for i in range(10) if i not in (test_fold, val_fold)]
 
-    print(f"Found {len(train_files)} train, {len(val_files)} val, {len(test_files)} test files.")
+        def get_files_from_folds(fold_list):
+            files = []
+            for f in fold_list:
+                fold_dir = os.path.join(root, f"fold_{f}")
+                # Keep track of relative path so the loader finds it correctly
+                files.extend([os.path.join(f"fold_{f}", fname) for fname in os.listdir(fold_dir)])
+            return files
 
-    # prepare training and test data loader
-    train_dataset = MIRRORGAMELoader(os.path.join(root, "train"), train_files)
-    test_dataset = MIRRORGAMELoader(os.path.join(root, "test"), test_files)
-    val_dataset = MIRRORGAMELoader(os.path.join(root, "val"), val_files)
+        train_files = get_files_from_folds(train_folds)
+        val_files = get_files_from_folds([val_fold])
+        test_files = get_files_from_folds([test_fold])
+        
+        np.random.shuffle(train_files)
+        print(f"CV Fold {fold}: Found {len(train_files)} train, {len(val_files)} val, {len(test_files)} test files.")
+        
+    else:
+        train_files = os.listdir(os.path.join(root, "train"))
+        np.random.shuffle(train_files)
+        val_files = os.listdir(os.path.join(root, "val"))
+        test_files = os.listdir(os.path.join(root, "test"))
+        print(f"Found {len(train_files)} train, {len(val_files)} val, {len(test_files)} test files.")
+        # Prepend 'train/', 'val/', 'test/' so the loader finds them
+        train_files = [os.path.join("train", f) for f in train_files]
+        val_files = [os.path.join("val", f) for f in val_files]
+        test_files = [os.path.join("test", f) for f in test_files]
+
+    # No change needed to the loader itself, it just joins root + relative path!
+    train_dataset = MIRRORGAMELoader(root, train_files)
+    test_dataset = MIRRORGAMELoader(root, test_files)
+    val_dataset = MIRRORGAMELoader(root, val_files)
 
     return train_dataset, test_dataset, val_dataset
 
