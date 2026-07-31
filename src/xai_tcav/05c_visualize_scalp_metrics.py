@@ -100,47 +100,167 @@ def get_channel_coords():
         print("Falling back to random coordinates (DEBUG ONLY). Check channel names.")
         return np.random.rand(len(STANDARD_CHANNELS), 2), 1.0
 
+# def plot_scalp_grid(means, sigs, effects, coords, max_dist, args):
+#     """
+#     Plots the 4x3 grid of scalp maps.
+#     """
+#     print(f"Generating Visualization (Cutoff: d > {args.min_effect_size})...")
+    
+#     fig, axes = plt.subplots(3, 4, figsize=(20, 15))
+#     axes = axes.flatten()
+    
+#     # --- 1. Determine Color Scale ---
+#     # We want the colorbar to be symmetric or logical based on the metric
+#     if args.metric == "Consistency":
+#         # Cosine similarity: 0 to 1, usually high
+#         vmin, vmax = 0.5, 1.0
+#         cmap = plt.get_cmap('Reds')
+#     elif args.metric in ["Accuracy", "AUC"]:
+#         # 0.5 to 1.0
+#         vmin, vmax = 0.5, 1.0 #0.8? Adjust based on data range
+        
+#         # Auto-adjust max if data is super strong
+#         data_max = np.nanmax(means)
+#         if data_max > 0.9: 
+#             vmax = 1.0
+#         else: 
+#             # vmax = min(data_max + 0.05, 0.8)
+#             vmax = data_max + 0.05
+        
+#         # cmap = plt.get_cmap('plasma') 
+#         cmap = LinearSegmentedColormap.from_list(
+#                                                 "peach_to_red",
+#                                                 ["#FFCB8D", "#D72638"]
+#                                             )
+#     else:
+#         vmin, vmax = np.nanmin(means), np.nanmax(means)
+#         cmap = plt.get_cmap('viridis')
+
+#     norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
+
+#     # --- 2. Iterate Layers ---
+#     for layer_id in range(12):
+#         ax = axes[layer_id]
+        
+#         # Get data for this layer
+#         l_means = means[layer_id]
+#         l_sigs = sigs[layer_id]
+#         l_effects = effects[layer_id]
+        
+#         # Draw Head Outline
+#         head_circle = patches.Circle((0, 0), radius=max_dist, color='black', fill=False, linewidth=1, alpha=0.3)
+#         ax.add_patch(head_circle)
+        
+#         # Nose (Optional schematic)
+#         nose_x = [0, max_dist*0.1, -max_dist*0.1, 0]
+#         nose_y = [max_dist*1.1, max_dist*1.0, max_dist*1.0, max_dist*1.1]
+#         ax.plot(nose_x, nose_y, color='black', linewidth=1, alpha=0.3)
+
+#         # --- 3. Plot Channels ---
+#         # We classify channels into two groups: "Show" and "Hide"
+#         # Show = Significant AND High Effect
+#         # Hide = Not Significant OR Low Effect
+        
+#         is_shown = (l_sigs == True) & (np.abs(l_effects) >= args.min_effect_size)
+        
+#         # A. Plot Hidden (Insignificant) - Small Dots
+#         hidden_idx = np.where(~is_shown)[0]
+#         if len(hidden_idx) > 0:
+#             ax.scatter(coords[hidden_idx, 0], coords[hidden_idx, 1],
+#                        c='gray', s=10, alpha=0.3, edgecolors='none', zorder=1)
+            
+#         # B. Plot Shown (Significant) - Large Colored Circles
+#         shown_idx = np.where(is_shown)[0]
+#         if len(shown_idx) > 0:
+#             sc = ax.scatter(coords[shown_idx, 0], coords[shown_idx, 1],
+#                             c=l_means[shown_idx], cmap=cmap, norm=norm,
+#                             s=450, edgecolors='grey', linewidths=0.1, zorder=2)
+            
+#             # Add Labels
+#             for idx in shown_idx:
+#                 ax.text(coords[idx, 0], coords[idx, 1], STANDARD_CHANNELS[idx],
+#                         ha='center', va='center', fontsize=8, color='white', 
+#                         fontweight='bold', zorder=3)
+        
+#         # Formatting
+#         ax.set_title(f"Layer {layer_id}", fontsize=12)
+#         ax.set_aspect('equal')
+#         ax.axis('off')
+#         lim = max_dist * 1.15
+#         ax.set_xlim(-lim, lim)
+#         ax.set_ylim(-lim, lim)
+
+#     # --- 4. Colorbar & Layout ---
+#     # Leave room on the right for the colorbar: [left, bottom, right, top]
+#     fig.tight_layout(rect=[0.0, 0.0, 0.90, 1.0])
+
+#     # Add colorbar on the right (in the reserved space)
+#     cbar_ax = fig.add_axes([0.92, 0.15, 0.02, 0.7])
+#     sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+#     sm.set_array([])
+#     cbar = fig.colorbar(sm, cax=cbar_ax)
+#     cbar.set_label(f"Mean {args.metric}", fontsize=14)
+    
+#     # # Title
+#     # fig.suptitle(f"Scalp Distribution: {args.band} / {args.level}\n"
+#     #              f"Metric: {args.metric} ({args.cav_type} CAV) | Cutoff: p<0.05 & |d|>{args.min_effect_size}", 
+#     #              fontsize=16, y=1.02)
+    
+#     # Save
+#     out_name = f"scalp_viz_{args.band}_{args.level}_{args.cav_type}_{args.metric}.png"
+#     out_path = os.path.join(args.output_dir, out_name)
+#     plt.savefig(out_path, dpi=200, bbox_inches='tight')
+#     print(f"\nSaved visualization to: {out_path}")
+#     plt.close()
+
 def plot_scalp_grid(means, sigs, effects, coords, max_dist, args):
     """
-    Plots the 4x3 grid of scalp maps.
+    Plots the grid of scalp maps for the selected layers.
     """
-    print(f"Generating Visualization (Cutoff: d > {args.min_effect_size})...")
+    print(f"Generating Visualization for layers {args.layers} (Cutoff: d > {args.min_effect_size})...")
     
-    fig, axes = plt.subplots(3, 4, figsize=(20, 15))
+    # --- 1. Dynamic Grid Calculation ---
+    n_plots = len(args.layers)
+    cols = min(4, n_plots) # Max 4 columns
+    rows = (n_plots + cols - 1) // cols
+    
+    # fig, axes = plt.subplots(rows, cols, figsize=(5 * cols, 5 * rows))
+    fig, axes = plt.subplots(rows, cols, figsize=(7.5, 2 * rows))
+    
+    # Ensure axes is always a flattened array for easy indexing
+    if n_plots == 1:
+        axes = np.array([axes])
     axes = axes.flatten()
     
-    # --- 1. Determine Color Scale ---
-    # We want the colorbar to be symmetric or logical based on the metric
+    # --- 2. Determine Color Scale ---
     if args.metric == "Consistency":
-        # Cosine similarity: 0 to 1, usually high
         vmin, vmax = 0.5, 1.0
         cmap = plt.get_cmap('Reds')
     elif args.metric in ["Accuracy", "AUC"]:
-        # 0.5 to 1.0
-        vmin, vmax = 0.5, 1.0 #0.8? Adjust based on data range
-        
-        # Auto-adjust max if data is super strong
+        vmin = 0.5
         data_max = np.nanmax(means)
         if data_max > 0.9: 
             vmax = 1.0
         else: 
-            # vmax = min(data_max + 0.05, 0.8)
             vmax = data_max + 0.05
         
-        # cmap = plt.get_cmap('plasma') 
+        # cmap = LinearSegmentedColormap.from_list(
+        #     "peach_to_red", ["#FFCB8D", "#D72638"]
+        # )
+
         cmap = LinearSegmentedColormap.from_list(
-                                                "peach_to_red",
-                                                ["#FFCB8D", "#D72638"]
-                                            )
+            "white_peach_red",
+            ["#FEEFDD", "#FFCB8D", "#D72638"]
+            )
     else:
         vmin, vmax = np.nanmin(means), np.nanmax(means)
         cmap = plt.get_cmap('viridis')
 
     norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
 
-    # --- 2. Iterate Layers ---
-    for layer_id in range(12):
-        ax = axes[layer_id]
+    # --- 3. Iterate Selected Layers ---
+    for i, layer_id in enumerate(args.layers):
+        ax = axes[i]
         
         # Get data for this layer
         l_means = means[layer_id]
@@ -156,59 +276,65 @@ def plot_scalp_grid(means, sigs, effects, coords, max_dist, args):
         nose_y = [max_dist*1.1, max_dist*1.0, max_dist*1.0, max_dist*1.1]
         ax.plot(nose_x, nose_y, color='black', linewidth=1, alpha=0.3)
 
-        # --- 3. Plot Channels ---
-        # We classify channels into two groups: "Show" and "Hide"
-        # Show = Significant AND High Effect
-        # Hide = Not Significant OR Low Effect
-        
+        # Plot Channels
         is_shown = (l_sigs == True) & (np.abs(l_effects) >= args.min_effect_size)
         
-        # A. Plot Hidden (Insignificant) - Small Dots
         hidden_idx = np.where(~is_shown)[0]
         if len(hidden_idx) > 0:
             ax.scatter(coords[hidden_idx, 0], coords[hidden_idx, 1],
                        c='gray', s=10, alpha=0.3, edgecolors='none', zorder=1)
             
-        # B. Plot Shown (Significant) - Large Colored Circles
         shown_idx = np.where(is_shown)[0]
         if len(shown_idx) > 0:
             sc = ax.scatter(coords[shown_idx, 0], coords[shown_idx, 1],
                             c=l_means[shown_idx], cmap=cmap, norm=norm,
-                            s=450, edgecolors='grey', linewidths=0.1, zorder=2)
+                            s=150, edgecolors='white', linewidths=0.1, zorder=2)
             
-            # Add Labels
-            for idx in shown_idx:
-                ax.text(coords[idx, 0], coords[idx, 1], STANDARD_CHANNELS[idx],
-                        ha='center', va='center', fontsize=8, color='white', 
-                        fontweight='bold', zorder=3)
+            # for idx in shown_idx:
+            #     ax.text(coords[idx, 0], coords[idx, 1], STANDARD_CHANNELS[idx],
+            #             ha='center', va='center', fontsize=4, color='white', 
+            #             fontweight='bold', zorder=3)
         
-        # Formatting
-        ax.set_title(f"Layer {layer_id}", fontsize=12)
+        ax.set_title(f"Layer {layer_id}", fontsize=10, fontweight='bold')
         ax.set_aspect('equal')
         ax.axis('off')
         lim = max_dist * 1.15
         ax.set_xlim(-lim, lim)
         ax.set_ylim(-lim, lim)
 
-    # --- 4. Colorbar & Layout ---
-    # Leave room on the right for the colorbar: [left, bottom, right, top]
-    fig.tight_layout(rect=[0.0, 0.0, 0.90, 1.0])
+    # Hide any unused subplots (if n_plots isn't a perfect multiple of cols)
+    for j in range(n_plots, len(axes)):
+        axes[j].axis('off')
 
-    # Add colorbar on the right (in the reserved space)
-    cbar_ax = fig.add_axes([0.92, 0.15, 0.02, 0.7])
+    # --- 4. Colorbar & Layout ---
+    fig.tight_layout(rect=[0.0, 0.0, 0.90, 1.0], w_pad=0.0, h_pad=0.0)
+    # fig.tight_layout(rect=[0.0, 0.15, 1.0, 0.9]) # [left, bottom, right, top]
+    # fig.tight_layout(rect=[0.0, 0.12, 1.0, 0.95], w_pad=0.0, h_pad=0.0)
+
+
+    cbar_ax = fig.add_axes([0.92, 0.28, 0.02, 0.47])
     sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
     sm.set_array([])
     cbar = fig.colorbar(sm, cax=cbar_ax)
-    cbar.set_label(f"Mean {args.metric}", fontsize=14)
+    # cbar.set_label(f"Mean {args.metric}", fontsize=14)
+
+    # cbar_ax = fig.add_axes([0.1, 0.05, 0.8, 0.04])  # [left, bottom, width, height]
+    # sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+    # sm.set_array([])
     
-    # # Title
-    # fig.suptitle(f"Scalp Distribution: {args.band} / {args.level}\n"
-    #              f"Metric: {args.metric} ({args.cav_type} CAV) | Cutoff: p<0.05 & |d|>{args.min_effect_size}", 
-    #              fontsize=16, y=1.02)
+    # # Set orientation to horizontal
+    # cbar = fig.colorbar(sm, cax=cbar_ax, orientation='horizontal')
     
-    # Save
-    out_name = f"scalp_viz_{args.band}_{args.level}_{args.cav_type}_{args.metric}.png"
+    # Remove the black border outline
+    cbar.outline.set_visible(False)
+    
+    cbar.set_label(f"Mean CAV {args.metric}", fontsize=10)
+    
+    # Append layers to the output filename for clarity
+    layers_str = "_".join(map(str, args.layers)) if len(args.layers) < 12 else "all_layers"
+    out_name = f"scalp_viz_{args.band}_{args.level}_{args.cav_type}_{args.metric}_{layers_str}.png"
     out_path = os.path.join(args.output_dir, out_name)
+    
     plt.savefig(out_path, dpi=200, bbox_inches='tight')
     print(f"\nSaved visualization to: {out_path}")
     plt.close()
@@ -221,6 +347,8 @@ def main():
                         help="Root directory containing the 'concepts' folder.")
     parser.add_argument("--output_dir", type=str, required=True,
                         help="Where to save the resulting plot.")
+    parser.add_argument("--layers", type=int, nargs='+', default=list(range(12)),
+                        help="List of layers to plot (e.g., --layers 8 9 10). Defaults to all 12.")
     
     # Selection parameters
     parser.add_argument("--band", type=str, required=True, choices=['alpha', 'beta'],
