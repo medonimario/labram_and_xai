@@ -1,38 +1,24 @@
 import os
-import sys
-import torch
+import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import matplotlib.colors as mcolors
-import matplotlib.patches as patches
 from matplotlib.colors import LinearSegmentedColormap
-from torch.nn import functional as F
-from einops import rearrange
+import matplotlib.patches as patches
 import mne
 from mne.viz.topomap import _find_topomap_coords
 
-# Import your existing utilities
-# from src.labram_ft.run_class_finetuning import get_dataset, get_models
-# import src.labram_ft.utils
-# Compute paths relative to this script's location
-current_dir = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.abspath(os.path.join(current_dir, "..")))          # Adds 'src/'
-sys.path.append(os.path.abspath(os.path.join(current_dir, "../labram_ft"))) # Adds 'src/labram_ft/'
-
-# Now your imports work perfectly without needing python -m or environment variables
-from labram_ft.run_class_finetuning import get_dataset, get_models
-import utils
-
 def get_channel_coords(ch_names):
     """
-    Returns 2D coordinates for the dataset channel list using MNE.
-    Automatically handles capitalization differences (e.g., 'FPZ' -> 'Fpz')
+    Returns 2D coordinates for the dataset channel list using MNE's biosemi64 montage.
+    Automatically handles capitalization differences (e.g., 'FPZ' -> 'Fpz').
     """
-    # Fix casing for MNE standard 10-20/10-05 montages
+    # Fix casing to match standard biosemi64 naming
     mne_names = [ch.replace('Z', 'z').replace('FP', 'Fp') for ch in ch_names]
     
-    montage = mne.channels.make_standard_montage('standard_1020')
+    # Use the biosemi64 montage for an even circular distribution
+    montage = mne.channels.make_standard_montage('biosemi64')
     
     try:
         info = mne.create_info(ch_names=mne_names, sfreq=1, ch_types='eeg')
@@ -58,21 +44,30 @@ def get_channel_coords(ch_names):
 def plot_attention_topomaps(attn_data, ch_names, coords, max_dist, title, save_path, cmap_type="absolute"):
     """
     Plots a 1xA grid of scalp maps, where A is the number of time windows.
-    attn_data should be shape [N_channels, A_windows]
     """
     A_windows = attn_data.shape[1]
     
     # 1 row, A columns. ~5x5 inches per topomap.
-    fig, axes = plt.subplots(1, A_windows, figsize=(5 * A_windows, 5))
+    fig, axes = plt.subplots(1, A_windows, figsize=(7.5, 2.5))
+    # fig, axes = plt.subplots(1, A_windows, figsize=(7.5, 3.5), gridspec_kw={'wspace': 0.05})
     if A_windows == 1:
         axes = np.array([axes])
     axes = axes.flatten()
     
     # Determine Color Scale
     if cmap_type == "absolute":
-        vmin = 0
+        # vmin = np.min(attn_data)
+        vmin=0
         vmax = np.max(attn_data)
-        cmap = plt.get_cmap('plasma')
+        # cmap = LinearSegmentedColormap.from_list(
+        #                                         "peach_to_red",
+        #                                         ["#FFCB8D", "#D72638"]
+        #                                     )
+
+        cmap = LinearSegmentedColormap.from_list(
+            "white_peach_red",
+            ["#FEEFDD", "#FFCB8D", "#D72638"]
+            )
     else:
         # For difference maps (diverging)
         vmax = np.max(np.abs(attn_data))
@@ -95,43 +90,73 @@ def plot_attention_topomaps(attn_data, ch_names, coords, max_dist, title, save_p
         ax.plot(nose_x, nose_y, color='black', linewidth=1, alpha=0.3)
 
         # Plot all channels as large colored circles
-        sc = ax.scatter(coords[:, 0], coords[:, 1],
-                        c=window_weights, cmap=cmap, norm=norm,
-                        s=450, edgecolors='grey', linewidths=0.1, zorder=2)
+        ax.scatter(coords[:, 0], coords[:, 1],
+                   c=window_weights, cmap=cmap, norm=norm,
+                   s=150, edgecolors='white', linewidths=0.1, zorder=2)
         
         # Add text labels inside circles
         for idx in range(len(ch_names)):
             ax.text(coords[idx, 0], coords[idx, 1], ch_names[idx],
-                    ha='center', va='center', fontsize=8, color='black' if cmap_type=="absolute" else 'white', 
+                    ha='center', va='center', fontsize=4, color='black' if cmap_type=="bwr" else 'white', 
                     fontweight='bold', zorder=3)
         
         # Formatting
-        ax.set_title(f"Time Window {a+1} (sec)", fontsize=14, pad=10)
+        # ax.set_title(f"Window {a+1}", fontsize=10, pad=10)
+        ax.set_title(f"Window {a+1}", fontsize=10, y=-0.15, fontweight='bold', color='black')
+
         ax.set_aspect('equal')
         ax.axis('off')
-        lim = max_dist * 1.15
-        ax.set_xlim(-lim, lim)
-        ax.set_ylim(-lim, lim)
+        lim_x = max_dist * 1.01
+        lim_y = max_dist * 1.15
+        ax.set_xlim(-lim_x, lim_x)
+        ax.set_ylim(-lim_y, lim_y)
 
-    # Colorbar layout
-    fig.tight_layout(rect=[0.0, 0.0, 0.92, 0.9])
+    # # Colorbar layout - adjusted to leave room at the bottom instead of the right
+    # fig.tight_layout(rect=[0.0, 0.15, 1.0, 0.9])
     
-    # Add colorbar on the right
-    cbar_ax = fig.add_axes([0.94, 0.15, 0.02, 0.7])
+    # # Add colorbar underneath the plots [left, bottom, width, height]
+    # cbar_ax = fig.add_axes([0.1, 0.05, 0.8, 0.04]) 
+    # sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+    # sm.set_array([])
+    
+    # # Set orientation to horizontal
+    # cbar = fig.colorbar(sm, cax=cbar_ax, orientation='horizontal')
+    
+    # # Remove the black border outline
+    # cbar.outline.set_visible(False)
+    
+    # label = "Attention Weight" if cmap_type == "absolute" else "Δ Attention (Coord - Solo)"
+    # cbar.set_label(label, fontsize=12, labelpad=10)
+
+    # 1. Adjust tight_layout to leave room at the TOP [left, bottom, right, top]
+    fig.tight_layout(rect=[0.0, 0.0, 1.0, 0.85])
+    
+    # 2. Add colorbar near the top [left, bottom, width, height]
+    cbar_ax = fig.add_axes([0.1, 0.90, 0.8, 0.04]) 
     sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
     sm.set_array([])
-    cbar = fig.colorbar(sm, cax=cbar_ax)
-    label = "Attention Weight" if cmap_type == "absolute" else "Δ Attention (Coord - Solo)"
-    cbar.set_label(label, fontsize=14)
     
-    fig.suptitle(title, fontsize=18, fontweight='bold', y=0.98)
+    # Set orientation to horizontal
+    cbar = fig.colorbar(sm, cax=cbar_ax, orientation='horizontal')
+    
+    # 3. Move ticks and label to the top side of the colorbar
+    cbar.ax.xaxis.set_ticks_position('top')
+    cbar.ax.xaxis.set_label_position('top')
+    
+    # Remove the black border outline
+    cbar.outline.set_visible(False)
+    
+    label = "Patch attention weight" if cmap_type == "absolute" else "Δ Attention (Coord - Solo)"
+    cbar.set_label(label, fontsize=12, labelpad=8)
+    
+    # fig.suptitle(title, fontsize=14, fontweight='bold', y=0.98)
     
     plt.savefig(save_path, dpi=200, bbox_inches='tight')
     plt.close()
 
 
 def plot_heatmap(data, y_labels, x_labels, title, save_path, cmap="viridis", center=None):
-    plt.figure(figsize=(8, 14))
+    plt.figure(figsize=(8, 7.5))
     ax = sns.heatmap(data, cmap=cmap, center=center, 
                      yticklabels=y_labels, xticklabels=x_labels, 
                      cbar_kws={'label': 'Attention Weight'})
@@ -145,96 +170,47 @@ def plot_heatmap(data, y_labels, x_labels, title, save_path, cmap="viridis", cen
     plt.close()
 
 
-def extract_and_plot_attention(checkpoint_dir):
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    checkpoint_path = os.path.join(checkpoint_dir, 'checkpoint-best.pth')
+def generate_visualizations(data_dir, plot_dir):
+    print("--- Loading Saved Data ---")
     
-    if not os.path.exists(checkpoint_path):
-        raise FileNotFoundError(f"Could not find checkpoint at {checkpoint_path}")
-
-    print("--- Loading Checkpoint and Arguments ---")
-    checkpoint = torch.load(checkpoint_path, map_location='cpu')
-    args = checkpoint['args']
-    args.use_attention_pooling = True 
-    print(f"Dataset: {args.dataset}")
-    
-    # 1. Load Dataset
-    _, test_dataset, _, ch_names, _ = get_dataset(args)
-    data_loader_test = torch.utils.data.DataLoader(
-        test_dataset,
-        batch_size=args.batch_size,
-        shuffle=False,
-        num_workers=4,
-        pin_memory=True
-    )
-
-    # 2. Get MNE Coordinates for Topomaps
-    coords, max_dist = get_channel_coords(ch_names)
-
-    # 3. Load Model
-    model = get_models(args)
-    utils.load_state_dict(model, checkpoint.get('model', checkpoint.get('module', checkpoint)))
-    model.to(device)
-    model.eval()
-    print("Model loaded successfully.")
-
-    # 4. Setup Forward Hook
-    saved_attn_logits = []
-    def hook_fn(module, input, output):
-        saved_attn_logits.append(output.detach())
-    handle = model.attention_pool.register_forward_hook(hook_fn)
-    input_chans = utils.get_input_chans(ch_names)
-
-    all_targets = []
-
-    print("--- Extracting Attention Weights ---")
-    with torch.no_grad():
-        for batch in data_loader_test:
-            EEG = batch[0].float().to(device) / 100
-            EEG = rearrange(EEG, 'B N (A T) -> B N A T', T=200) 
-            target = batch[-1].to(device)
-            
-            _ = model(EEG, input_chans=input_chans)
-            print(f"Logits collected so far: {len(saved_attn_logits)}")
-            all_targets.append(target.cpu().numpy())
-
-    handle.remove()
-
-    # 5. Process Logits into Softmax
-    all_attn_logits = torch.cat(saved_attn_logits, dim=0)          
-    all_attn_weights = F.softmax(all_attn_logits, dim=1).cpu().numpy()
-    all_targets = np.concatenate(all_targets, axis=0)              
-
-    B, N_A, _ = all_attn_weights.shape
-    N = len(ch_names)       
-    A = N_A // N            
-    
-    attn_maps = all_attn_weights.reshape(B, N, A)
-
-    print("--- Plotting Results ---")
-    plot_dir = os.path.join(checkpoint_dir, "attention_plots")
-    os.makedirs(plot_dir, exist_ok=True)
-
-    if all_targets.ndim > 1:
-        all_targets = all_targets.squeeze()
+    # Load Channels
+    ch_names_path = os.path.join(data_dir, "ch_names.txt")
+    with open(ch_names_path, "r") as f:
+        ch_names = [line.strip() for line in f.readlines()]
         
-    class_0_maps = attn_maps[all_targets == 0].mean(axis=0) 
-    class_1_maps = attn_maps[all_targets == 1].mean(axis=0) 
-    
+    # Load CSVs
+    class_0_maps = np.loadtxt(os.path.join(data_dir, "class_0_maps.csv"), delimiter=",")
+    class_1_maps = np.loadtxt(os.path.join(data_dir, "class_1_maps.csv"), delimiter=",")
+
+    # If the data happens to be 1D (only 1 window), reshape it so the plotting loops work
+    if class_0_maps.ndim == 1:
+        class_0_maps = class_0_maps[:, np.newaxis]
+        class_1_maps = class_1_maps[:, np.newaxis]
+
+    A = class_0_maps.shape[1]
     time_labels = [f"Win {i+1}" for i in range(A)]
     
+    coords, max_dist = get_channel_coords(ch_names)
+
+    print("--- Generating Plots ---")
+    os.makedirs(plot_dir, exist_ok=True)
+
     # Standard Heatmaps
-    plot_heatmap(class_0_maps, ch_names, time_labels, "Average Attention: Solo Condition", os.path.join(plot_dir, "attn_matrix_solo.png"))
-    plot_heatmap(class_1_maps, ch_names, time_labels, "Average Attention: Coordination Condition", os.path.join(plot_dir, "attn_matrix_coord.png"))
-    plot_heatmap(class_1_maps - class_0_maps, ch_names, time_labels, "Attention Difference (Coord - Solo)", os.path.join(plot_dir, "attn_matrix_diff.png"), cmap="coolwarm", center=0)
+    plot_heatmap(class_0_maps, ch_names, time_labels, "Average Attention: Solo Condition", os.path.join(plot_dir, "attn_matrix_solo.svg"))
+    plot_heatmap(class_1_maps, ch_names, time_labels, "Average Attention: Coordination Condition", os.path.join(plot_dir, "attn_matrix_coord.svg"))
+    plot_heatmap(class_1_maps - class_0_maps, ch_names, time_labels, "Attention Difference (Coord - Solo)", os.path.join(plot_dir, "attn_matrix_diff.svg"), cmap="coolwarm", center=0)
 
-    # Topomaps (Using your style)
-    plot_attention_topomaps(class_0_maps, ch_names, coords, max_dist, "Scalp Attention: Solo", os.path.join(plot_dir, "attn_topo_solo.png"), cmap_type="absolute")
-    plot_attention_topomaps(class_1_maps, ch_names, coords, max_dist, "Scalp Attention: Coordination", os.path.join(plot_dir, "attn_topo_coord.png"), cmap_type="absolute")
-    plot_attention_topomaps(class_1_maps - class_0_maps, ch_names, coords, max_dist, "Scalp Attention Difference (Coord - Solo)", os.path.join(plot_dir, "attn_topo_diff.png"), cmap_type="diff")
+    # Topomaps
+    plot_attention_topomaps(class_0_maps, ch_names, coords, max_dist, "Scalp Attention: Solo", os.path.join(plot_dir, "attn_topo_solo.svg"), cmap_type="absolute")
+    plot_attention_topomaps(class_1_maps, ch_names, coords, max_dist, "Scalp Attention: Coordination", os.path.join(plot_dir, "attn_topo_coord.svg"), cmap_type="absolute")
+    plot_attention_topomaps(class_1_maps - class_0_maps, ch_names, coords, max_dist, "Scalp Attention Difference (Coord - Solo)", os.path.join(plot_dir, "attn_topo_diff.svg"), cmap_type="diff")
 
-    print(f"All plots saved to {plot_dir}")
+    print(f"All plots saved successfully to {plot_dir}")
 
 if __name__ == "__main__":
-    TARGET_DIR = "./src/labram_ft/checkpoints/mg_solo-coord_cv2/fold_0/"
-    extract_and_plot_attention(TARGET_DIR)
+    parser = argparse.ArgumentParser(description="Visualize Extracted Attention Weights")
+    parser.add_argument("--data_dir", type=str, required=True, help="Directory containing the extracted CSV/TXT files")
+    parser.add_argument("--plot_dir", type=str, default="./attention_plots", help="Directory to save the generated plots")
+    args = parser.parse_args()
+
+    generate_visualizations(args.data_dir, args.plot_dir)
