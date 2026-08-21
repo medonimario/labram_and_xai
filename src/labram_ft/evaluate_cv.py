@@ -2,6 +2,7 @@ import argparse
 import json
 import os
 import numpy as np
+import scipy.stats as stats  # Added import for statistical analysis
 import matplotlib.pyplot as plt
 from collections import defaultdict
 
@@ -197,6 +198,7 @@ def plot_cv_curves(epochs_data, output_dir):
 def save_cv_summary(best_test_metrics, output_dir):
     """
     Computes the final Mean and Std across all folds and saves to a text file.
+    Includes statistical significance testing against a 0.50 (chance) baseline.
     """
     if not best_test_metrics:
         return
@@ -221,7 +223,55 @@ def save_cv_summary(best_test_metrics, output_dir):
             
         f.write("\n" + "="*70 + "\n\n")
         
-        # 2. Write the breakdown per fold for transparency
+        # 2. Statistical Significance Testing
+        target_metric = 'test_balanced_accuracy'
+        if target_metric in metric_keys:
+            ba_vals = [fold_data[target_metric] for fold_data in best_test_metrics if target_metric in fold_data]
+            
+            n = len(ba_vals)
+            mean_ba = np.mean(ba_vals)
+            sem_ba = stats.sem(ba_vals)
+            
+            # 95% Confidence Interval
+            if sem_ba > 0:
+                ci_lower, ci_upper = stats.t.interval(0.95, df=n-1, loc=mean_ba, scale=sem_ba)
+            else:
+                ci_lower, ci_upper = mean_ba, mean_ba
+                
+            # One-sample t-test (mu = 0.50)
+            t_stat, p_val_ttest = stats.ttest_1samp(ba_vals, popmean=0.50)
+            
+            # Wilcoxon signed-rank test
+            diffs = np.array(ba_vals) - 0.50
+            try:
+                res_wilcoxon = stats.wilcoxon(diffs, alternative='two-sided', zero_method='pratt')
+                w_stat = res_wilcoxon.statistic
+                p_val_wilcoxon = res_wilcoxon.pvalue
+            except ValueError:
+                # Handles edge cases where all differences are exactly 0
+                w_stat = "N/A"
+                p_val_wilcoxon = 1.0
+
+            f.write("### STATISTICAL SIGNIFICANCE (vs 50% Chance Baseline) ###\n")
+            f.write(f"Metric Evaluated: {target_metric}\n")
+            f.write(f"95% Confidence Interval: [{ci_lower:.4f}, {ci_upper:.4f}]\n")
+            
+            # Format p-values nicely
+            t_p_str = f"{p_val_ttest:.4e}" if p_val_ttest < 0.0001 else f"{p_val_ttest:.4f}"
+            w_p_str = f"{p_val_wilcoxon:.4e}" if isinstance(p_val_wilcoxon, float) and p_val_wilcoxon < 0.0001 else (f"{p_val_wilcoxon:.4f}" if isinstance(p_val_wilcoxon, float) else "N/A")
+            
+            f.write(f"One-Sample t-test: t = {t_stat:.4f}, p-value = {t_p_str}\n")
+            f.write(f"Wilcoxon Signed-Rank: W = {w_stat}, p-value = {w_p_str}\n")
+            
+            alpha = 0.05
+            if p_val_ttest < alpha:
+                f.write("\nConclusion: The model's balanced accuracy is STATISTICALLY SIGNIFICANTLY different from a 50% random chance baseline.\n")
+            else:
+                f.write("\nConclusion: The model's balanced accuracy is NOT significantly different from 50% chance.\n")
+                
+            f.write("\n" + "="*70 + "\n\n")
+
+        # 3. Write the breakdown per fold for transparency
         f.write("### BREAKDOWN PER FOLD ###\n")
         for fold_data in best_test_metrics:
             f.write(f"--- {fold_data['fold']} (Optimal Epoch: {fold_data['optimal_epoch']}) ---\n")

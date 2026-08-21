@@ -44,8 +44,10 @@ TUEV_DATASET_ROOT = os.path.join(PROCESSED_DATASET_PATH, "tuh_eeg_events/process
 TUAB_DATASET_ROOT = os.path.join(PROCESSED_DATASET_PATH, "tuh_eeg_abnormal/processed")
 # FORCEGAME_DATASET_ROOT = os.path.join(FG_DATASET_PATH, "processed")
 FORCEGAME_DATASET_ROOT = os.path.join(FG_DATASET_PATH, "processed_cv")
-FORCEGAME_GROUP_DATASET_ROOT = os.path.join(FG_DATASET_PATH, "processed_group")
-FORCEGAME_FRIENDSHIP_DATASET_ROOT = os.path.join(FG_DATASET_PATH, "processed_friendship")
+# FORCEGAME_GROUP_DATASET_ROOT = os.path.join(FG_DATASET_PATH, "processed_group")
+FORCEGAME_GROUP_DATASET_ROOT = os.path.join(FG_DATASET_PATH, "processed_group_cv")
+# FORCEGAME_FRIENDSHIP_DATASET_ROOT = os.path.join(FG_DATASET_PATH, "processed_friendship")
+FORCEGAME_FRIENDSHIP_DATASET_ROOT = os.path.join(FG_DATASET_PATH, "processed_friendship_cv")
 MIRRORGAME_SOLO_COORD_DATASET_ROOT = os.path.join(MG_DATASET_PATH, "processed_solo-coord_overlapping")
 MIRRORGAME_SOLO_COORD_DATASET_ROOT = os.path.join(MG_DATASET_PATH, "processed_solo-coord_cv")
 # MIRRORGAME_SPONT_COORD_DATASET_ROOT = os.path.join(MG_DATASET_PATH, "processed_spont-coord_overlapping")
@@ -273,7 +275,7 @@ def get_dataset(args):
         metrics = ["pr_auc", "roc_auc", "accuracy", "balanced_accuracy"]
 
     elif args.dataset == 'FORCEGAME_GROUP':
-        train_dataset, test_dataset, val_dataset = utils.prepare_FORCEGAME_dataset(FORCEGAME_GROUP_DATASET_ROOT)
+        train_dataset, test_dataset, val_dataset = utils.prepare_FORCEGAME_dataset(FORCEGAME_GROUP_DATASET_ROOT, fold=args.fold)
         ch_names = ['FP1','FPZ','FP2',
                      'AF7','AF3','AFZ','AF4','AF8',
                      'F7','F5','F3','F1','FZ','F2','F4','F6','F8',
@@ -289,7 +291,7 @@ def get_dataset(args):
         metrics = ["pr_auc", "roc_auc", "accuracy", "balanced_accuracy"]
 
     elif args.dataset == 'FORCEGAME_FRIENDSHIP':
-        train_dataset, test_dataset, val_dataset = utils.prepare_FORCEGAME_dataset(FORCEGAME_FRIENDSHIP_DATASET_ROOT)
+        train_dataset, test_dataset, val_dataset = utils.prepare_FORCEGAME_dataset(FORCEGAME_FRIENDSHIP_DATASET_ROOT, fold=args.fold)
         ch_names = ['FP1','FPZ','FP2',
                      'AF7','AF3','AFZ','AF4','AF8',
                      'F7','F5','F3','F1','FZ','F2','F4','F6','F8',
@@ -400,9 +402,9 @@ def main(args, ds_init):
     elif args.dataset == 'FORCEGAME':
         project_name = "labram-ft-fg"
     elif args.dataset == 'FORCEGAME_GROUP':
-        project_name = "labram-ft-forcegame-group"
+        project_name = "labram-ft-fg-group"
     elif args.dataset == 'FORCEGAME_FRIENDSHIP':
-        project_name = "labram-ft-forcegame-friendship"
+        project_name = "labram-ft-fg-friendship"
     elif args.dataset == 'MIRRORGAME_SOLO_COORD':
         project_name = "labram-ft-mg-solo-coord"
     elif args.dataset == 'MIRRORGAME_SPONT_COORD':
