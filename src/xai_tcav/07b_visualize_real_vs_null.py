@@ -269,7 +269,7 @@ def main(args):
         
         # Plot (filename now includes cav_type)
         safe_metric_name = m.replace(" ", "_").lower()
-        output_filename = f"{args.cav_type}_{safe_metric_name}.png"
+        output_filename = f"{args.cav_type}_{safe_metric_name}.svg"
         
         plot_raincloud_robust(
             data_registry, 

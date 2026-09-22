@@ -297,7 +297,7 @@ def main(args):
         
         # Plot with dynamic filename
         safe_name = m.replace(" ", "_").lower()
-        output_filename = f"{args.cav_type}_real_vs_null_{safe_name}.png"
+        output_filename = f"{args.cav_type}_real_vs_null_{safe_name}.svg"
         
         plot_raincloud_robust(
             data_registry, 

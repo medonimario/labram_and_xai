@@ -298,7 +298,7 @@ def main(args):
     # 2. Plot Consistency (Histograms) - No statistical stars here usually
     plot_consistency_histograms(
         df, 
-        os.path.join(args.output_dir, "comparison_1_consistency.png")
+        os.path.join(args.output_dir, "comparison_1_consistency.svg")
     )
     # 2.5 Analyze and Plot Consistency
     print("\n--- Processing Consistency ---")
@@ -306,7 +306,7 @@ def main(args):
     plot_raincloud_robust(
         df, stats_consistency, x_col='layer', y_col='consistency', hue_col='method',
         title=f"Consistency: Filter vs Pattern",
-        output_path=os.path.join(args.output_dir, "comparison_1b_consistency_raincloud.png"),
+        output_path=os.path.join(args.output_dir, "comparison_1b_consistency_raincloud.svg"),
         y_label="Cosine Similarity"
     )
 
@@ -317,7 +317,7 @@ def main(args):
     plot_raincloud_robust(
         df, stats_acc, x_col='layer', y_col='test_acc', hue_col='method',
         title=f"Generalization Accuracy: Filter vs Pattern",
-        output_path=os.path.join(args.output_dir, "comparison_2_accuracy.png"),
+        output_path=os.path.join(args.output_dir, "comparison_2_accuracy.svg"),
         y_label="Test Accuracy"
     )
 
@@ -328,7 +328,7 @@ def main(args):
     plot_raincloud_robust(
         df, stats_auc, x_col='layer', y_col='test_auc', hue_col='method',
         title=f"Generalization AUC: Filter vs Pattern",
-        output_path=os.path.join(args.output_dir, "comparison_3_auc.png"),
+        output_path=os.path.join(args.output_dir, "comparison_3_auc.svg"),
         y_label="Test AUC"
     )
 

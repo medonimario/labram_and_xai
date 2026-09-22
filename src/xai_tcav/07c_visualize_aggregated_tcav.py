@@ -82,45 +82,184 @@ def get_channel_coords():
         print(f"Error creating montage: {e}")
         return np.random.rand(len(STANDARD_CHANNELS), 2), 1.0
 
+# def plot_scalp_grid(tcav_means, tcav_sigs, tcav_effects, 
+#                     acc_means, 
+#                     coords, max_dist, args):
+#     """
+#     Plots the 4x3 grid with Dual Filtering.
+#     """
+#     print(f"Generating Visualization...")
+#     print(f"  Filters: TCAV |d| > {args.min_effect_size} AND CAV Acc > {args.min_accuracy}")
+
+#     fig, axes = plt.subplots(3, 4, figsize=(20, 15))
+#     axes = axes.flatten()
+    
+#     # --- 1. Color Scale Setup ---
+#     if args.metric == "TCAV Score":
+#         # Diverging centered at 0.5
+#         # Blue (0.0) -> White (0.5) -> Red (1.0)
+#         vmin, vmax = 0.0, 1.0
+#         # Custom diverging colormap to ensure 0.5 is perfectly white
+#         colors = ["#03045E", "#ffffff", "#D72638"] # Blue -> White -> Red
+#         cmap = LinearSegmentedColormap.from_list("custom_bwr", colors, N=256)
+#         # We can also use 'bwr' or 'coolwarm'
+#     elif args.metric in ["Cosine Similarity", "Sensitivity"]:
+#         # Diverging centered at 0.0
+#         # Purple/Pink (Negative) -> White (0) -> Green (Positive)
+#         limit = max(abs(np.nanmin(tcav_means)), abs(np.nanmax(tcav_means)))
+#         if limit == 0: limit = 0.1
+#         vmin, vmax = -limit, limit
+#         colors = ["#03045E", "#ffffff", "#D72638"] # Blue -> White -> Red
+#         cmap = LinearSegmentedColormap.from_list("custom_bwr", colors, N=256)
+#     else:
+#         vmin, vmax = np.nanmin(tcav_means), np.nanmax(tcav_means)
+#         colors = ["#03045E", "#ffffff", "#D72638"] # Blue -> White -> Red
+#         cmap = LinearSegmentedColormap.from_list("custom_bwr", colors, N=256)
+
+#     norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
+
+#     # --- 2. Iterate Layers ---
+#     for layer_id in range(12):
+#         ax = axes[layer_id]
+        
+#         # Get data vectors for this layer
+#         t_means = tcav_means[layer_id]
+#         t_sigs  = tcav_sigs[layer_id]
+#         t_effs  = tcav_effects[layer_id]
+#         a_means = acc_means[layer_id]
+        
+#         # Draw Head
+#         head_circle = patches.Circle((0, 0), radius=max_dist, color='black', fill=False, linewidth=1, alpha=0.3)
+#         ax.add_patch(head_circle)
+#         nose_x = [0, max_dist*0.1, -max_dist*0.1, 0]
+#         nose_y = [max_dist*1.1, max_dist*1.0, max_dist*1.0, max_dist*1.1]
+#         ax.plot(nose_x, nose_y, color='black', linewidth=1, alpha=0.3)
+
+#         # --- 3. Apply Dual Filters ---
+#         # Condition A: TCAV Metric is statistically valid
+#         valid_tcav = (t_sigs == True) & (np.abs(t_effs) >= args.min_effect_size)
+        
+#         # Condition B: Concept was learned accurately (Gating)
+#         # Note: We handle NaNs in accuracy (treat as 0.5/Fail)
+#         safe_acc = np.nan_to_num(a_means, nan=0.5)
+#         valid_concept = safe_acc >= args.min_accuracy
+        
+#         # Final Mask
+#         is_shown = valid_tcav & valid_concept
+        
+#         # --- 4. Plot ---
+#         # A. Hidden (Tiny Dots)
+#         hidden_idx = np.where(~is_shown)[0]
+#         if len(hidden_idx) > 0:
+#             ax.scatter(coords[hidden_idx, 0], coords[hidden_idx, 1],
+#                        c='gray', s=10, alpha=0.3, edgecolors='none', zorder=1)
+            
+#         # B. Shown (Large Colored Circles)
+#         shown_idx = np.where(is_shown)[0]
+#         if len(shown_idx) > 0:
+#             sc = ax.scatter(coords[shown_idx, 0], coords[shown_idx, 1],
+#                             c=t_means[shown_idx], cmap=cmap, norm=norm,
+#                             s=450, edgecolors='grey', linewidths=0.1, zorder=2)
+            
+#             # Labels
+#             for idx in shown_idx:
+#                 # Text color logic: White for dark bubbles, Black for light bubbles
+#                 val = t_means[idx]
+#                 if args.metric == "TCAV Score":
+#                     txt_col = 'white' if (val < 0.3 or val > 0.7) else 'black'
+#                     fontweight='bold' if txt_col == 'white' else 'normal'
+
+#                 elif args.metric in ["Cosine Similarity", "Sensitivity"]:
+#                     mid_point = 0.0
+#                     txt_col = 'white' if (val < mid_point - (vmax - vmin)/6 or val > mid_point + (vmax - vmin)/6) else 'black'
+#                     fontweight='bold' if txt_col == 'white' else 'normal'
+#                 else:
+#                     txt_col = 'black'
+                    
+#                 ax.text(coords[idx, 0], coords[idx, 1], STANDARD_CHANNELS[idx],
+#                         ha='center', va='center', fontsize=8, color=txt_col, 
+#                         fontweight=fontweight, zorder=3)
+        
+#         ax.set_title(f"Layer {layer_id}", fontsize=12)
+#         ax.set_aspect('equal')
+#         ax.axis('off')
+#         lim = max_dist * 1.15
+#         ax.set_xlim(-lim, lim)
+#         ax.set_ylim(-lim, lim)
+
+#     # --- 5. Legends & Colorbar ---
+#     fig.tight_layout(rect=[0.0, 0.0, 0.90, 1.0])
+
+#     cbar_ax = fig.add_axes([0.92, 0.15, 0.02, 0.7])
+#     sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+#     sm.set_array([])
+#     cbar = fig.colorbar(sm, cax=cbar_ax)
+#     cbar.set_label(f"Mean {args.metric}", fontsize=14)
+    
+#     # Add Tick Labels for TCAV Score context
+#     if args.metric == "TCAV Score":
+#         cbar.set_ticks([0.0, 0.5, 1.0])
+#         cbar.set_ticklabels(['Negative (0.0)', 'Neutral (0.5)', 'Positive (1.0)'])
+
+#     # fig.suptitle(f"Scalp Distribution: {args.band} / {args.level}\n"
+#     #              f"Metric: {args.metric} ({args.cav_type}) | "
+#     #              f"Filters: p<0.05, |d|>{args.min_effect_size}, Acc>{args.min_accuracy*100:.0f}%", 
+#     #              fontsize=16, y=1.02)
+    
+#     # Save
+#     safe_metric = args.metric.replace(" ", "_")
+#     out_name = f"scalp_tcav_{args.band}_{args.level}_{args.cav_type}_{safe_metric}.png"
+#     out_path = os.path.join(args.output_dir, out_name)
+#     plt.savefig(out_path, dpi=200, bbox_inches='tight')
+#     print(f"\nSaved visualization to: {out_path}")
+#     plt.close()
+
 def plot_scalp_grid(tcav_means, tcav_sigs, tcav_effects, 
                     acc_means, 
                     coords, max_dist, args):
     """
-    Plots the 4x3 grid with Dual Filtering.
+    Plots the grid of scalp maps for the selected layers with Dual Filtering.
     """
-    print(f"Generating Visualization...")
+    print(f"Generating Visualization for layers {args.layers}...")
     print(f"  Filters: TCAV |d| > {args.min_effect_size} AND CAV Acc > {args.min_accuracy}")
 
-    fig, axes = plt.subplots(3, 4, figsize=(20, 15))
+    # --- 1. Dynamic Grid Calculation ---
+    n_plots = len(args.layers)
+    cols = min(4, n_plots) # Max 4 columns
+    rows = (n_plots + cols - 1) // cols
+    
+    # Calculate a proportional figsize and pull subplots close together
+    # fig, axes = plt.subplots(rows, cols, figsize=(7.5/2, 5 * rows/2))
+    fig, axes = plt.subplots(rows, cols, figsize=(7.5, 2 * rows))
+
+    
+    if n_plots == 1:
+        axes = np.array([axes])
     axes = axes.flatten()
     
-    # --- 1. Color Scale Setup ---
+    # --- 2. Color Scale Setup ---
     if args.metric == "TCAV Score":
-        # Diverging centered at 0.5
-        # Blue (0.0) -> White (0.5) -> Red (1.0)
         vmin, vmax = 0.0, 1.0
-        # Custom diverging colormap to ensure 0.5 is perfectly white
-        colors = ["#03045E", "#ffffff", "#D72638"] # Blue -> White -> Red
+        colors = ["#03045E", "#ffffff", "#D72638"] 
         cmap = LinearSegmentedColormap.from_list("custom_bwr", colors, N=256)
-        # We can also use 'bwr' or 'coolwarm'
     elif args.metric in ["Cosine Similarity", "Sensitivity"]:
-        # Diverging centered at 0.0
-        # Purple/Pink (Negative) -> White (0) -> Green (Positive)
         limit = max(abs(np.nanmin(tcav_means)), abs(np.nanmax(tcav_means)))
         if limit == 0: limit = 0.1
         vmin, vmax = -limit, limit
-        colors = ["#03045E", "#ffffff", "#D72638"] # Blue -> White -> Red
+        colors = ["#03045E", "#ffffff", "#D72638"] 
+        # vmin, vmax = -limit, 0
+        # colors = ["#03045E", "#ffffff"] 
         cmap = LinearSegmentedColormap.from_list("custom_bwr", colors, N=256)
     else:
         vmin, vmax = np.nanmin(tcav_means), np.nanmax(tcav_means)
-        colors = ["#03045E", "#ffffff", "#D72638"] # Blue -> White -> Red
+        colors = ["#03045E", "#ffffff", "#D72638"] 
         cmap = LinearSegmentedColormap.from_list("custom_bwr", colors, N=256)
 
     norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
 
-    # --- 2. Iterate Layers ---
-    for layer_id in range(12):
-        ax = axes[layer_id]
+    # --- 3. Iterate Selected Layers ---
+    for i, layer_id in enumerate(args.layers):
+        ax = axes[i]
         
         # Get data vectors for this layer
         t_means = tcav_means[layer_id]
@@ -135,81 +274,84 @@ def plot_scalp_grid(tcav_means, tcav_sigs, tcav_effects,
         nose_y = [max_dist*1.1, max_dist*1.0, max_dist*1.0, max_dist*1.1]
         ax.plot(nose_x, nose_y, color='black', linewidth=1, alpha=0.3)
 
-        # --- 3. Apply Dual Filters ---
-        # Condition A: TCAV Metric is statistically valid
+        # Apply Dual Filters
         valid_tcav = (t_sigs == True) & (np.abs(t_effs) >= args.min_effect_size)
-        
-        # Condition B: Concept was learned accurately (Gating)
-        # Note: We handle NaNs in accuracy (treat as 0.5/Fail)
         safe_acc = np.nan_to_num(a_means, nan=0.5)
         valid_concept = safe_acc >= args.min_accuracy
-        
-        # Final Mask
         is_shown = valid_tcav & valid_concept
         
-        # --- 4. Plot ---
-        # A. Hidden (Tiny Dots)
+        # Plot Hidden (Tiny Dots)
         hidden_idx = np.where(~is_shown)[0]
         if len(hidden_idx) > 0:
             ax.scatter(coords[hidden_idx, 0], coords[hidden_idx, 1],
                        c='gray', s=10, alpha=0.3, edgecolors='none', zorder=1)
             
-        # B. Shown (Large Colored Circles)
+        # Plot Shown (Colored Circles)
         shown_idx = np.where(is_shown)[0]
         if len(shown_idx) > 0:
             sc = ax.scatter(coords[shown_idx, 0], coords[shown_idx, 1],
                             c=t_means[shown_idx], cmap=cmap, norm=norm,
-                            s=450, edgecolors='grey', linewidths=0.1, zorder=2)
+                            s=150, edgecolors='white', linewidths=0.1, zorder=2)
             
             # Labels
             for idx in shown_idx:
-                # Text color logic: White for dark bubbles, Black for light bubbles
                 val = t_means[idx]
                 if args.metric == "TCAV Score":
                     txt_col = 'white' if (val < 0.3 or val > 0.7) else 'black'
                     fontweight='bold' if txt_col == 'white' else 'normal'
-
                 elif args.metric in ["Cosine Similarity", "Sensitivity"]:
                     mid_point = 0.0
                     txt_col = 'white' if (val < mid_point - (vmax - vmin)/6 or val > mid_point + (vmax - vmin)/6) else 'black'
                     fontweight='bold' if txt_col == 'white' else 'normal'
                 else:
                     txt_col = 'black'
+                    fontweight='normal'
                     
-                ax.text(coords[idx, 0], coords[idx, 1], STANDARD_CHANNELS[idx],
-                        ha='center', va='center', fontsize=8, color=txt_col, 
-                        fontweight=fontweight, zorder=3)
+                # ax.text(coords[idx, 0], coords[idx, 1], STANDARD_CHANNELS[idx],
+                #         ha='center', va='center', fontsize=4, color=txt_col, 
+                #         fontweight=fontweight, zorder=3)
         
-        ax.set_title(f"Layer {layer_id}", fontsize=12)
+        ax.set_title(f"Layer {layer_id}", fontsize=10, fontweight='bold')
         ax.set_aspect('equal')
         ax.axis('off')
         lim = max_dist * 1.15
         ax.set_xlim(-lim, lim)
         ax.set_ylim(-lim, lim)
 
-    # --- 5. Legends & Colorbar ---
-    fig.tight_layout(rect=[0.0, 0.0, 0.90, 1.0])
+    # Hide any unused subplots
+    for j in range(n_plots, len(axes)):
+        axes[j].axis('off')
 
-    cbar_ax = fig.add_axes([0.92, 0.15, 0.02, 0.7])
+    # --- 4. Colorbar & Layout ---
+    # Tighten layout and leave space at the bottom
+    # fig.tight_layout(rect=[0.0, 0.12, 1.0, 0.95], w_pad=0.0, h_pad=0.0)
+    fig.tight_layout(rect=[0.0, 0.0, 0.90, 1.0], w_pad=0.0, h_pad=0.0)
+
+    # Colorbar on the right side
+    cbar_ax = fig.add_axes([0.92, 0.28, 0.02, 0.47])  # [left, bottom, width, height]
     sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
     sm.set_array([])
     cbar = fig.colorbar(sm, cax=cbar_ax)
-    cbar.set_label(f"Mean {args.metric}", fontsize=14)
+
+    # # Add colorbar underneath the plots
+    # cbar_ax = fig.add_axes([0.1, 0.05, 0.8, 0.04]) # [left, bottom, width, height]
+    # sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+    # sm.set_array([])
     
-    # Add Tick Labels for TCAV Score context
+    # cbar = fig.colorbar(sm, cax=cbar_ax, orientation='horizontal')
+    cbar.outline.set_visible(False)
+    cbar.set_label(f"Mean {args.metric}", fontsize=10)
+    
     if args.metric == "TCAV Score":
         cbar.set_ticks([0.0, 0.5, 1.0])
         cbar.set_ticklabels(['Negative (0.0)', 'Neutral (0.5)', 'Positive (1.0)'])
 
-    # fig.suptitle(f"Scalp Distribution: {args.band} / {args.level}\n"
-    #              f"Metric: {args.metric} ({args.cav_type}) | "
-    #              f"Filters: p<0.05, |d|>{args.min_effect_size}, Acc>{args.min_accuracy*100:.0f}%", 
-    #              fontsize=16, y=1.02)
-    
-    # Save
+    # Append layers to the output filename
+    layers_str = "_".join(map(str, args.layers)) if len(args.layers) < 12 else "all_layers"
     safe_metric = args.metric.replace(" ", "_")
-    out_name = f"scalp_tcav_{args.band}_{args.level}_{args.cav_type}_{safe_metric}.png"
+    out_name = f"scalp_tcav_{args.band}_{args.level}_{args.cav_type}_{safe_metric}_{layers_str}.png"
     out_path = os.path.join(args.output_dir, out_name)
+    
     plt.savefig(out_path, dpi=200, bbox_inches='tight')
     print(f"\nSaved visualization to: {out_path}")
     plt.close()
@@ -219,6 +361,8 @@ def main():
     
     parser.add_argument("--base_dir", type=str, required=True)
     parser.add_argument("--output_dir", type=str, required=True)
+    parser.add_argument("--layers", type=int, nargs='+', default=list(range(12)),
+                        help="List of layers to plot (e.g., --layers 8 9 10). Defaults to all 12.")
     
     # Selection
     parser.add_argument("--band", type=str, required=True)
